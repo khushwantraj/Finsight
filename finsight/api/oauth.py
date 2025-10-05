@@ -2,12 +2,18 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from finsight.connectors.factory import ConnectorFactory
-from finsight.core.credentials import TokenStore
+from finsight.core.credentials import TokenStore, CredentialManager
+from finsight.core.config import settings
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 
-# Initialize token store
-token_store = TokenStore()
+
+def get_token_store() -> TokenStore:
+    """Get or create token store instance."""
+    if settings.encryption_key:
+        return TokenStore(CredentialManager(settings.encryption_key))
+    # For testing without encryption key
+    return TokenStore(CredentialManager(CredentialManager.generate_key()))
 
 
 @router.get("/plaid/callback")
@@ -36,6 +42,7 @@ async def plaid_callback(
             access_token = result.data.get('access_token')
             
             # Store access token securely
+            token_store = get_token_store()
             token_store.store_token('plaid', user_id, access_token)
             
             return {
@@ -82,6 +89,7 @@ async def kite_callback(
             access_token = result.data.get('access_token')
             
             # Store access token securely
+            token_store = get_token_store()
             token_store.store_token('kite', user_id, access_token)
             
             return {
